@@ -21,7 +21,7 @@ def create_user_session(request, user):
         
         # Store session in database
         user_session = UserSession(
-            user=user.username,
+            user=user,
             session_key=session_key,
             ip_address=get_client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', '')
@@ -55,7 +55,7 @@ def get_current_user(request):
             return None
         
         # Verify session exists in database
-        user_session = UserSession.objects(user=username, session_key=session_key).first()
+        user_session = UserSession.objects.filter(user=username, session_key=session_key, is_active=True).first()
         if not user_session:
             # Session expired or invalid
             print(f"DEBUG: UserSession not found for user: {username}")
@@ -67,7 +67,7 @@ def get_current_user(request):
         user_session.save()
         
         # Get user
-        user = User.objects(username=username).first()
+        user = User.objects.filter(username=username).first()
         if not user:
             print(f"DEBUG: User not found in database: {username}")
             return None
@@ -94,7 +94,7 @@ def logout_user(request):
     if username and session_key:
         try:
             # Remove session from database
-            UserSession.objects(user=username, session_key=session_key).delete()
+            UserSession.objects.filter(user=username, session_key=session_key).delete()
         except Exception:
             pass  # Handle MongoDB connection issues gracefully
     

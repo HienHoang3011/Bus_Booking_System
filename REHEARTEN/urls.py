@@ -7,13 +7,6 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('accounts.urls')),
-    # Temporarily disabled URLs for apps that don't exist in current structure:
-    # path('ocr/', include('OCRfeature.urls')),
-    # path('chat/', include('agenticRAG.urls')),
-    # path('support/', include('SupportChatbot.urls')),
-    # path('tts/', include('TextToSpeech.urls')),
-    # path('chunking/', include('SemanticChunking.urls')),
-    # path('takenote/', include('takenote.urls')),
     path('oauth/', include('social_django.urls', namespace='social')),
 ]
 

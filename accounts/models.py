@@ -1,41 +1,40 @@
-# from django.db import models  # Removed - only using MongoDB
-from mongoengine import Document, StringField, EmailField, DateTimeField, BooleanField, ListField
+from django.db import models
 from datetime import datetime
 from django.contrib.auth.hashers import make_password, check_password
 import re
 
 # Create your models here.
 
-class User(Document):
-    """MongoDB User model for authentication"""
+class User(models.Model):
     # User roles constants - simplified to only admin and user
     ROLES = [
         ('admin', 'Quản trị viên'),
         ('user', 'Người dùng'),
     ]
-    
-    username = StringField(max_length=150, required=True, unique=True)
-    email = EmailField(required=True, unique=True)
-    first_name = StringField(max_length=30, required=True)
-    last_name = StringField(max_length=30, required=True)
-    password = StringField(required=True)
-    role = StringField(max_length=20, choices=ROLES, default='user')
-    permissions = ListField(StringField(max_length=50), default=list)
-    is_active = BooleanField(default=True)
-    is_verified = BooleanField(default=False)
-    
+    username = models.CharField(max_length=300, unique=True)
+    email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    password = models.CharField(max_length=255)  # Hashed password
+    role = models.CharField(max_length=20, choices=ROLES, default='user')
+    permissions = models.JSONField(default=list)
+    is_active = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=False)
+
     # Django compatibility fields
-    is_staff = BooleanField(default=False)
-    is_superuser = BooleanField(default=False)
-    
-    
-    date_joined = DateTimeField(default=datetime.now)
-    last_login = DateTimeField()
-    
-    meta = {
-        'collection': 'users',
-        'indexes': ['username', 'email', 'role']
-    }
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(default=datetime.now)
+    last_login = models.DateTimeField(null=True, blank=True)
+    USERNAME_FIELD = 'username'
+
+    # Các trường này sẽ được hỏi khi chạy lệnh createsuperuser
+    REQUIRED_FIELDS = ['email', 'first_name', 'last_name']
+    class Meta:
+        ordering = ['-date_joined']
+        verbose_name = "Người dùng"
+        verbose_name_plural = "Người dùng"
+        db_table = 'users'
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
@@ -68,10 +67,10 @@ class User(Document):
         if not username or not email or not password:
             raise ValueError("Username, email và password là bắt buộc")
         
-        if cls.objects(username=username).first():
+        if cls.objects.filter(username=username).exists():
             raise ValueError("Tên đăng nhập đã tồn tại")
-            
-        if cls.objects(email=email).first():
+
+        if cls.objects.filter(email=email).exists():
             raise ValueError("Email đã được sử dụng")
         
         # Validate email format
@@ -105,18 +104,23 @@ class User(Document):
     @classmethod
     def authenticate(cls, username, password):
         """Authenticate user with username and password"""
-        user = cls.objects(username=username).first()
-        if user and user.check_password(password):
-            # Update last login
-            user.last_login = datetime.now()
-            user.save()
-            return user
+        try:
+            user = cls.objects.get(username=username)
+            if user.check_password(password):
+                # Update last login
+                user.last_login = datetime.now()
+                user.save()
+                return user
+        except cls.DoesNotExist:
+            pass
         return None
 
+    @property
     def is_authenticated(self):
         """Always return True for authenticated users"""
         return True
 
+    @property
     def is_anonymous(self):
         """Always return False for real users"""  
         return False
@@ -178,17 +182,24 @@ class User(Document):
         self.is_superuser = self.role == 'admin'
         super().save(*args, **kwargs)
 
-class UserSession(Document):
+class UserSession(models.Model):
     """User session management"""
-    user = StringField(required=True)  # username
-    session_key = StringField(required=True, unique=True)
-    created_at = DateTimeField(default=datetime.now)
-    last_activity = DateTimeField(default=datetime.now)
-    ip_address = StringField()
-    user_agent = StringField()
-    is_active = BooleanField(default=True)
+    session_key = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(default=datetime.now)
+    last_activity = models.DateTimeField(default=datetime.now)
+    ip_address = models.GenericIPAddressField()
+    user_agent = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    user = models.ForeignKey(
+        User, 
+        to_field='username',
+        related_name='sessions',
+        on_delete=models.CASCADE)
     
-    meta = {
-        'collection': 'user_sessions',
-        'indexes': ['user', 'session_key', 'created_at']
-    }
+    class Meta:
+        ordering = ['-last_activity']
+        db_table = 'user_sessions'
+
+    def __str__(self):
+        return f"Session for {self.user} from {self.ip_address}"
+    

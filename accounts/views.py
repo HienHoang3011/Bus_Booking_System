@@ -6,6 +6,7 @@ from .forms import CustomUserCreationForm, LoginForm, UserUpdateForm, PasswordCh
 from .models import User, UserSession
 from .utils import get_current_user, create_user_session, logout_user
 from .decorators import login_required, admin_required
+from django.shortcuts import get_object_or_404
 import secrets
 from datetime import datetime
 import json
@@ -31,8 +32,9 @@ def create_user_session(request, user):
         session_key = secrets.token_urlsafe(32)
         
         # Store session in database
+        user = get_object_or_404(User, id=user.id)
         user_session = UserSession(
-            user=user.username,
+            user=user,
             session_key=session_key,
             ip_address=get_client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', '')
@@ -59,7 +61,7 @@ def logout_user(request):
     if username and session_key:
         try:
             # Remove session from database
-            UserSession.objects(user=username, session_key=session_key).delete()
+            UserSession.objects.filter(user=username, session_key=session_key).delete()
         except Exception:
             pass  # Handle MongoDB connection issues gracefully
     
@@ -99,7 +101,7 @@ def register_view(request):
                 messages.success(request, f'Đăng ký thành công! Chào mừng {user.first_name} với vai trò {user.get_role_display()}! Bạn có thể đăng nhập ngay bây giờ.')
                 return redirect('login')
         except Exception as e:
-            messages.error(request, f'Có lỗi xảy ra (có thể do kết nối MongoDB): {str(e)}')
+            messages.error(request, f'Có lỗi xảy ra (có thể do kết nối PostgreSQL): {str(e)}')
     else:
         form = CustomUserCreationForm(current_user)
     
@@ -197,7 +199,7 @@ def admin_dashboard_view(request):
         # Role statistics - simplified for only admin and user
         role_stats = {}
         for role_key, role_name in User.ROLES:
-            role_stats[role_name] = User.objects(role=role_key).count()
+            role_stats[role_name] = User.objects.filter(role=role_key).count()
         
         # Recent users
         recent_users = User.objects.order_by('-date_joined')[:5]
@@ -244,7 +246,7 @@ def edit_user_view(request, username):
     current_user = get_current_user(request)
     
     try:
-        target_user = User.objects.get(username=username)
+        target_user = User.objects.filter(username=username).first()
     except User.DoesNotExist:
         messages.error(request, 'Không tìm thấy người dùng.')
         return redirect('users_management')
@@ -367,9 +369,8 @@ def api_toggle_user_status(request):
             return JsonResponse({'error': 'Bạn không thể thay đổi trạng thái hoạt động của chính mình!'}, status=403)
         
         # Find user
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
+        user = User.objects.filter(username=username).first()
+        if not user:
             return JsonResponse({'error': 'Không tìm thấy người dùng'}, status=404)
         
         # Store old status info for logging

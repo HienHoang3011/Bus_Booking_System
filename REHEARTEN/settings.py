@@ -9,94 +9,6 @@ import certifi
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
-
-def connect_mongodb_atlas():
-    """
-    Custom function to connect to MongoDB Atlas with multiple fallback strategies
-    for handling SSL/TLS handshake issues.
-    """
-    connection_string = os.getenv('MONGODB_ATLAS_URI', 
-        'mongodb+srv://hieu:hieu@cluster0.yrpxm.mongodb.net/ReHearten_db?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE'
-    )
-    db_name = os.getenv('MONGODB_ATLAS_DB', 'ReHearten_db')
-    
-    # Strategy 1: Try with full SSL verification
-    try:
-        print("🔒 Attempting connection with full SSL verification...")
-        mongoengine.connect(
-            db=db_name,
-            host=connection_string,
-            alias='default',
-            tls=True,
-            tlsAllowInvalidCertificates=False,
-            tlsAllowInvalidHostnames=False,
-            tlsCAFile=certifi.where(),
-            serverSelectionTimeoutMS=30000,
-            connectTimeoutMS=30000,
-            socketTimeoutMS=30000,
-            maxPoolSize=10,
-            minPoolSize=1,
-            maxIdleTimeMS=30000,
-            retryWrites=True,
-            retryReads=True,
-            authMechanism='SCRAM-SHA-1'
-        )
-        print("✅ Connected with full SSL verification!")
-        return True
-    except Exception as e1:
-        print(f"⚠️ Full SSL verification failed: {e1}")
-    
-    # Strategy 2: Try with relaxed SSL settings
-    try:
-        print("🔓 Attempting connection with relaxed SSL settings...")
-        mongoengine.connect(
-            db=db_name,
-            host=connection_string,
-            alias='default',
-            tls=True,
-            tlsAllowInvalidCertificates=True,
-            tlsAllowInvalidHostnames=True,
-            serverSelectionTimeoutMS=30000,
-            connectTimeoutMS=30000,
-            socketTimeoutMS=30000,
-            maxPoolSize=10,
-            minPoolSize=1,
-            maxIdleTimeMS=30000,
-            retryWrites=True,
-            retryReads=True,
-            authMechanism='SCRAM-SHA-1'
-        )
-        print("✅ Connected with relaxed SSL settings!")
-        return True
-    except Exception as e2:
-        print(f"⚠️ Relaxed SSL settings failed: {e2}")
-    
-    # Strategy 3: Try with minimal SSL configuration
-    try:
-        print("🔧 Attempting connection with minimal SSL configuration...")
-        mongoengine.connect(
-            db=db_name,
-            host=connection_string,
-            alias='default',
-            serverSelectionTimeoutMS=30000,
-            connectTimeoutMS=30000,
-            socketTimeoutMS=30000,
-            maxPoolSize=10,
-            minPoolSize=1,
-            maxIdleTimeMS=30000,
-            retryWrites=True,
-            retryReads=True
-        )
-        print("✅ Connected with minimal SSL configuration!")
-        return True
-    except Exception as e3:
-        print(f"❌ All connection strategies failed!")
-        print(f"Error 1: {e1}")
-        print(f"Error 2: {e2}")
-        print(f"Error 3: {e3}")
-        return False
-
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -107,10 +19,7 @@ SECRET_KEY = 'django-insecure-&(2xt*_5eoht1+00eudkbni74$r5haman_h0)yd!_9x&*=tfgf
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
-
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -152,7 +61,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'REHEARTEN.wsgi.application'
-
+CORS_ORIGIN_ALLOW_ALL = True
 
 
 
@@ -162,52 +71,28 @@ WSGI_APPLICATION = 'REHEARTEN.wsgi.application'
 # Use dummy database since we're using only MongoDB
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',  # Use PostgreSQL engine as a placeholder
+        'NAME': 'bus_booking_management',
+        'USER': 'postgres',
+        'PASSWORD': 'Hch301105*',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
-# Disable Django's database migrations since we're using MongoDB
-MIGRATION_MODULES = {
-    'accounts': None,
-    # 'admin': None,
-    # 'auth': None,
-    # 'contenttypes': None,
-    # 'sessions': None,
-    # 'messages': None,
-}
+# Enable Django migrations for PostgreSQL
+# MIGRATION_MODULES = {
+#     'accounts': None,
+# }
 
 # Authentication Backends
 AUTHENTICATION_BACKENDS = [
-    'accounts.backends.MongoUserBackend',
+    'accounts.backends.AuthUserBackend',
     'social_core.backends.google.GoogleOAuth2',  # Google OAuth2 backend
     'django.contrib.auth.backends.ModelBackend',  # Thêm dòng này!
 ]
 
 # MongoDB Configuration - Support both Local and Atlas
-
-# MongoDB Atlas Configuration
-MONGODB_ATLAS_SETTINGS = {
-    'CONNECTION_STRING': os.getenv('MONGODB_ATLAS_URI', 
-        'mongodb+srv://hieu:hieu@cluster0.yrpxm.mongodb.net/ReHearten_db?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE'
-    ),
-    'DB_NAME': os.getenv('MONGODB_ATLAS_DB', 'ReHearten_db'),
-}
-
-# Connect to MongoDB Atlas only
-print("🌐 Connecting to MongoDB Atlas...")
-if connect_mongodb_atlas():
-    MONGODB_INFO = {
-        'TYPE': 'MongoDB Atlas (Cloud)',
-        'DATABASE': MONGODB_ATLAS_SETTINGS['DB_NAME'],
-        'CONNECTION': 'Atlas Cloud Cluster - ReHearten'
-    }
-    print("✅ MongoDB Atlas connection established successfully!")
-else:
-    print("❌ MongoDB Atlas Connection Error: All connection strategies failed!")
-    print("🔥 Application cannot start without MongoDB Atlas connection!")
-    raise Exception("MongoDB Atlas connection failed: All connection strategies failed!")
-
 # Session Configuration - Use MongoDB sessions instead of Django's database sessions
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 SESSION_CACHE_ALIAS = 'default'
@@ -324,7 +209,7 @@ LOGGING = {
     },
 }
 
-
+AUTH_USER_MODEL = 'accounts.User'
 
 # Add these lines after the MongoDB configuration section (around line 140)
 

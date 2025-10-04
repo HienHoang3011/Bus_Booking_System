@@ -11,9 +11,9 @@ def process_login_gg(strategy, details, backend, user=None, *args, **kwargs):
     username = email.split('@')[0] if email else ''
     password = 'google_oauth2_default_password'
 
-    mongo_user = User.objects(email=email).first()
-    if not mongo_user and email:
-        mongo_user = User(
+    user = User.objects.filter(email=email).first() if email else None
+    if not user and email:
+        user = User(
             username=username,
             email=email,
             first_name=first_name or username,
@@ -21,13 +21,13 @@ def process_login_gg(strategy, details, backend, user=None, *args, **kwargs):
             is_active=True,
             is_verified=True,
         )
-        mongo_user.set_password(password)
-        mongo_user.save()
+        user.set_password(password)
+        user.save()
 
     # Tạo session custom cho user Google
-    if mongo_user:
+    if user:
         request = strategy.request
-        create_user_session(request, mongo_user)
+        create_user_session(request, user)
 
 # Middleware đồng bộ session custom sau khi đăng nhập Google
 class SyncCustomSessionMiddleware:
@@ -36,7 +36,7 @@ class SyncCustomSessionMiddleware:
 
     def __call__(self, request):
         if not request.session.get('username') and hasattr(request, 'user') and getattr(request.user, 'is_authenticated', False) and getattr(request.user, 'email', None):
-            mongo_user = User.objects(email=request.user.email).first()
-            if mongo_user:
-                create_user_session(request, mongo_user)
+            user = User.objects.filter(email=request.user.email).first()
+            if user:
+                create_user_session(request, user)
         return self.get_response(request)

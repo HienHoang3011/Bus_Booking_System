@@ -69,7 +69,7 @@ class CustomUserCreationForm(forms.Form):
 
     def clean_username(self):
         username = self.cleaned_data['username']
-        if User.objects(username=username).first():
+        if User.objects.filter(username=username).exists():
             raise ValidationError("Tên đăng nhập đã tồn tại")
         
         # Validate username format
@@ -83,7 +83,7 @@ class CustomUserCreationForm(forms.Form):
 
     def clean_email(self):
         email = self.cleaned_data['email']
-        if User.objects(email=email).first():
+        if User.objects.filter(email=email).exists():
             raise ValidationError("Email này đã được sử dụng")
         return email
 
@@ -250,9 +250,12 @@ class UserUpdateForm(forms.Form):
     def clean_email(self):
         email = self.cleaned_data['email']
         # Check if email exists for other users
-        existing_user = User.objects(email=email).first()
-        if existing_user and existing_user.id != self.instance.id:
-            raise ValidationError("Email này đã được sử dụng bởi người dùng khác")
+        try:
+            existing_user = User.objects.get(email=email)
+            if existing_user.id != self.instance.id:
+                raise ValidationError("Email này đã được sử dụng bởi người dùng khác")
+        except User.DoesNotExist:
+            pass
         return email
 
     def clean_role(self):

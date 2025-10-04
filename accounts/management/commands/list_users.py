@@ -25,7 +25,7 @@ class Command(BaseCommand):
         try:
             # Get users based on filter
             if role_filter:
-                users = User.objects(role=role_filter).order_by('username')
+                users = User.objects.filter(role=role_filter).order_by('username')
                 self.stdout.write(f'👥 Danh sách người dùng có vai trò "{dict(User.ROLES)[role_filter]}":')
             else:
                 users = User.objects.all().order_by('username')
@@ -83,7 +83,7 @@ class Command(BaseCommand):
             
             # Total users
             total_users = User.objects.count()
-            active_users = User.objects(is_active=True).count()
+            active_users = User.objects.filter(is_active=True).count()
             inactive_users = total_users - active_users
             
             self.stdout.write(f'📈 Tổng quan:')
@@ -93,8 +93,8 @@ class Command(BaseCommand):
             self.stdout.write('')
             
             # Role statistics (simplified for admin and user only)
-            admin_count = User.objects(role='admin').count()
-            user_count = User.objects(role='user').count()
+            admin_count = User.objects.filter(role='admin').count()
+            user_count = User.objects.filter(role='user').count()
             
             self.stdout.write(f'🏷️  Phân bố vai trò:')
             self.stdout.write(f'   👑 Quản trị viên: {admin_count} người ({admin_count/total_users*100:.1f}%)')
@@ -102,7 +102,7 @@ class Command(BaseCommand):
             self.stdout.write('')
             
             # Login statistics
-            users_with_login = User.objects(last_login__ne=None).count()
+            users_with_login = User.objects.filter(last_login__isnull=False).count()
             users_never_login = total_users - users_with_login
             
             self.stdout.write(f'🔐 Thống kê đăng nhập:')
