@@ -2,7 +2,6 @@ from django.db import models
 from datetime import datetime
 from django.contrib.auth.hashers import make_password, check_password
 import re
-
 # Create your models here.
 
 class User(models.Model):
@@ -191,8 +190,7 @@ class UserSession(models.Model):
     user_agent = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
     user = models.ForeignKey(
-        User, 
-        to_field='username',
+        User,
         related_name='sessions',
         on_delete=models.CASCADE)
     
