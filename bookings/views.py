@@ -110,12 +110,11 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
         """Confirm a pending booking (admin only)"""
-        # Skip permission check for testing
-        # if not request.user.is_admin():
-        #     return Response(
-        #         {'error': 'Only admins can confirm bookings.'},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
+        if not request.user.is_admin():
+            return Response(
+                {'error': 'Only admins can confirm bookings.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         booking = self.get_object()
 
