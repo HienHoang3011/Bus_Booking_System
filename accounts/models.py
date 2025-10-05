@@ -1,6 +1,7 @@
 from django.db import models
 from datetime import datetime
 from django.contrib.auth.hashers import make_password, check_password
+from django.utils import timezone
 import re
 # Create your models here.
 
@@ -23,7 +24,7 @@ class User(models.Model):
     # Django compatibility fields
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
-    date_joined = models.DateTimeField(default=datetime.now)
+    date_joined = models.DateTimeField(default=timezone.now)
     last_login = models.DateTimeField(null=True, blank=True)
     USERNAME_FIELD = 'username'
 
@@ -107,7 +108,7 @@ class User(models.Model):
             user = cls.objects.get(username=username)
             if user.check_password(password):
                 # Update last login
-                user.last_login = datetime.now()
+                user.last_login = timezone.now()
                 user.save()
                 return user
         except cls.DoesNotExist:
@@ -184,8 +185,8 @@ class User(models.Model):
 class UserSession(models.Model):
     """User session management"""
     session_key = models.CharField(max_length=255, unique=True)
-    created_at = models.DateTimeField(default=datetime.now)
-    last_activity = models.DateTimeField(default=datetime.now)
+    created_at = models.DateTimeField(default=timezone.now)
+    last_activity = models.DateTimeField(default=timezone.now)
     ip_address = models.GenericIPAddressField()
     user_agent = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)

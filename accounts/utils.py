@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.utils import timezone
 from .models import User, UserSession
 from datetime import datetime
 import secrets
@@ -55,7 +56,7 @@ def get_current_user(request):
             return None
         
         # Verify session exists in database
-        user_session = UserSession.objects.filter(user=username, session_key=session_key, is_active=True).first()
+        user_session = UserSession.objects.filter(user__username=username, session_key=session_key, is_active=True).first()
         if not user_session:
             # Session expired or invalid
             print(f"DEBUG: UserSession not found for user: {username}")
@@ -63,7 +64,7 @@ def get_current_user(request):
             return None
         
         # Update last activity
-        user_session.last_activity = datetime.now()
+        user_session.last_activity = timezone.now()
         user_session.save()
         
         # Get user
@@ -94,7 +95,7 @@ def logout_user(request):
     if username and session_key:
         try:
             # Remove session from database
-            UserSession.objects.filter(user=username, session_key=session_key).delete()
+            UserSession.objects.filter(user__username=username, session_key=session_key).delete()
         except Exception:
             pass  # Handle MongoDB connection issues gracefully
     

@@ -12,6 +12,8 @@ class Locations(models.Model):
 
     def __str__(self):
         return self.name
+    def full_address(self):
+        return f"{self.name}, {self.city}"
     
 class Route(models.Model):
     start_location = models.ForeignKey(
@@ -35,6 +37,10 @@ class Route(models.Model):
 
     def __str__(self):
         return f"{self.start_location} to {self.end_location}"
+    def route_info(self):
+        return f"Route from {self.start_location.full_address()} to {self.end_location.full_address()}, Distance: {self.distance_km} km"
+    def get_start_location(self):
+        return self.start_location.name
     
 class Bus(models.Model):
     license_plate = models.CharField(max_length=30, unique=True)

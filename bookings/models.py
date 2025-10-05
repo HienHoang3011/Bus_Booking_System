@@ -3,12 +3,14 @@ from datetime import datetime
 from accounts.models import User
 from transport.models import Trip, Seat
 from django.utils.timezone import now
+import uuid
 class Booking(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Chờ xử lý'),
         ('Confirmed', 'Đã xác nhận'),
         ('Canceled', 'Đã hủy'),
     ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         User,
         related_name='bookings',

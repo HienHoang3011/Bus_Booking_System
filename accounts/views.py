@@ -2,71 +2,17 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+from django.utils import timezone
 from .forms import CustomUserCreationForm, LoginForm, UserUpdateForm, PasswordChangeForm
 from .models import User, UserSession
 from .utils import get_current_user, create_user_session, logout_user
 from .decorators import login_required, admin_required
-from django.shortcuts import get_object_or_404
-import secrets
 from datetime import datetime
 import json
 import logging
 import re
 
 logger = logging.getLogger(__name__)
-
-
-def get_client_ip(request):
-    """Get client IP address"""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
-
-
-def create_user_session(request, user):
-    """Create a user session"""
-    try:
-        session_key = secrets.token_urlsafe(32)
-        
-        # Store session in database
-        user = get_object_or_404(User, id=user.id)
-        user_session = UserSession(
-            user=user,
-            session_key=session_key,
-            ip_address=get_client_ip(request),
-            user_agent=request.META.get('HTTP_USER_AGENT', '')
-        )
-        user_session.save()
-        
-        # Store in Django session
-        request.session['user_id'] = str(user.id)
-        request.session['username'] = user.username
-        request.session['session_key'] = session_key
-        request.session['is_authenticated'] = True
-
-        return session_key
-    except Exception as e:
-        # Handle MongoDB connection issues gracefully
-        return None
-
-
-def logout_user(request):
-    """Logout user and cleanup session"""
-    username = request.session.get('username')
-    session_key = request.session.get('session_key')
-    
-    if username and session_key:
-        try:
-            # Remove session from database
-            UserSession.objects.filter(user=username, session_key=session_key).delete()
-        except Exception:
-            pass  # Handle MongoDB connection issues gracefully
-    
-    # Clear Django session
-    request.session.flush()
 
 
 def home_view(request):
@@ -120,7 +66,7 @@ def login_view(request):
                 session_key = create_user_session(request, user)
                 if session_key:
                     # Update last login
-                    user.last_login = datetime.now()
+                    user.last_login = timezone.now()
                     user.save()
                     
                     messages.success(request, f'Chào mừng {user.first_name} {user.last_name} ({user.get_role_display()})!')
@@ -337,7 +283,7 @@ def api_change_user_role(request):
                 'is_active': user.is_active,
                 'date_joined': user.date_joined.strftime('%d/%m/%Y %H:%M') if user.date_joined else '',
                 'changed_by': current_user.username,
-                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                'changed_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S')
             }
         })
         
@@ -403,7 +349,7 @@ def api_toggle_user_status(request):
                 'date_joined': user.date_joined.strftime('%d/%m/%Y %H:%M') if user.date_joined else '',
                 'last_login': user.last_login.strftime('%d/%m/%Y %H:%M') if user.last_login else None,
                 'changed_by': current_user.username,
-                'changed_at': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+                'changed_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S'),
                 'action': action
             }
         })
@@ -501,7 +447,7 @@ def api_profile_update(request):
                 'full_name': user.get_full_name(),
                 'role': user.get_role_display(),
                 'is_active': user.is_active,
-                'updated_at': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                'updated_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S')
             }
         }, status=200)
     except json.JSONDecodeError:

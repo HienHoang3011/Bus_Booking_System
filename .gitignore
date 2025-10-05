@@ -285,3 +285,4 @@ migrations/__pycache__
 accounts/migrations/__pycache__
 accounts/management/__pycache__
 chatbot_engine
+CLAUDE.md
