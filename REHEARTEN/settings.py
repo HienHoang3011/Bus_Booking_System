@@ -213,6 +213,3 @@ LOGGING = {
 }
 
 AUTH_USER_MODEL = 'accounts.User'
-
-# Add these lines after the MongoDB configuration section (around line 140)
-
