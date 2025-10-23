@@ -13,7 +13,7 @@ class Payment(models.Model):
         ('Pending', 'Chờ xử lý'),
         ('Completed', 'Hoàn thành'),
         ('Failed', 'Thất bại'),
-    ]
+    ]   
     booking = models.ForeignKey(
         Booking,
         related_name='payments',
