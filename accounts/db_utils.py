@@ -20,9 +20,10 @@ class DatabaseConnection:
         self.connection = None
     
     def get_connection(self):
-        """Get database connection"""
+        """Get database connection from Django settings (loaded from .env)"""
         if not self.connection or self.connection.closed:
             try:
+                # Django DATABASES settings automatically loaded from .env via os.getenv()
                 self.connection = psycopg2.connect(
                     host=settings.DATABASES['default']['HOST'],
                     port=settings.DATABASES['default']['PORT'],
@@ -175,6 +176,7 @@ def get_all_users():
     return execute_query(query, fetch_all=True)
 
 
+
 def count_users():
     """Count total users"""
     query = "SELECT COUNT(*) as count FROM users"
@@ -259,13 +261,17 @@ def update_user_session_activity(session_id):
 def delete_user_session(username, session_key):
     """Delete user session"""
     query = """
-        DELETE FROM user_sessions 
-        WHERE user_id = (SELECT id FROM users WHERE username = %s) 
+        DELETE FROM user_sessions
+        WHERE user_id = (SELECT id FROM users WHERE username = %s)
         AND session_key = %s
     """
     return execute_query(query, (username, session_key)) > 0
 
 
+def delete_user_sessions_by_user(user_id):
+    """Delete all sessions for a user"""
+    query = "DELETE FROM user_sessions WHERE user_id = %s"
+    return execute_query(query, (user_id,)) > 0
 
 
 def count_active_sessions():

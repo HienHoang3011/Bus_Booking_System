@@ -14,7 +14,7 @@ from .db_utils import (
 
 class UserSession:
     """User session class using raw SQL instead of Django ORM"""
-    
+
     def __init__(self, **kwargs):
         """Initialize user session object"""
         self.id = kwargs.get('id')
@@ -26,12 +26,13 @@ class UserSession:
         self.user_agent = kwargs.get('user_agent')
         self.is_active = kwargs.get('is_active', True)
         self.user = kwargs.get('user')  # User object if loaded
-    
+        self.pk = self.id  # Django compatibility
+
     def __str__(self):
         if self.user:
             return f"Session for {self.user.username} from {self.ip_address}"
         return f"Session {self.session_key} from {self.ip_address}"
-    
+
     def save(self, *args, **kwargs):
         """Save session to database"""
         if self.id:
@@ -47,15 +48,16 @@ class UserSession:
             )
             if session_id:
                 self.id = session_id
+                self.pk = session_id
                 return True
             return False
-    
+
     def delete(self):
         """Delete session from database"""
         if self.session_key and self.user:
             return db_delete_user_session(self.user.username, self.session_key)
         return False
-    
+
     @classmethod
     def objects(cls):
         """Return UserSessionManager for ORM-like interface"""
@@ -64,29 +66,29 @@ class UserSession:
 
 class UserSessionManager:
     """Manager class to provide ORM-like interface for UserSession"""
-    
+
     def filter(self, **kwargs):
         """Filter sessions by criteria - simplified implementation"""
         if 'user__username' in kwargs and 'session_key' in kwargs:
             session_data = db_get_user_session(kwargs['user__username'], kwargs['session_key'])
             return [UserSession(**session_data)] if session_data else []
         return []
-    
+
     def get(self, **kwargs):
         """Get single session by criteria"""
         sessions = self.filter(**kwargs)
         if not sessions:
             raise UserSession.DoesNotExist("Session not found")
         return sessions[0]
-    
+
     def all(self):
         """Get all sessions"""
         return []
-    
+
     def count(self):
         """Count active sessions"""
         return db_count_active_sessions()
-    
+
     def delete(self, **kwargs):
         """Delete sessions by criteria"""
         if 'user__username' in kwargs and 'session_key' in kwargs:

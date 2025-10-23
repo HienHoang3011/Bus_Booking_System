@@ -224,6 +224,9 @@ LOGGING = {
     },
 }
 
-AUTH_USER_MODEL = 'accounts.User'
+# AUTH_USER_MODEL commented out because we're using raw SQL instead of Django ORM
+# User authentication is handled via accounts.backends.AuthUserBackend
+# which uses raw SQL queries from accounts/db_utils.py
+# AUTH_USER_MODEL = 'accounts.User'
 
 

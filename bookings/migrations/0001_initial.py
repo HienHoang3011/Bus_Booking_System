@@ -12,7 +12,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        # Removed swappable_dependency since User is now using raw SQL
+        # migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('transport', '0001_initial'),
     ]
 
@@ -26,7 +27,8 @@ class Migration(migrations.Migration):
                 ('booking_time', models.DateTimeField(default=django.utils.timezone.now)),
                 ('status', models.CharField(choices=[('Pending', 'Chờ xử lý'), ('Confirmed', 'Đã xác nhận'), ('Canceled', 'Đã hủy')], default='Pending', max_length=10)),
                 ('trip', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='bookings', to='transport.trip')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='bookings', to=settings.AUTH_USER_MODEL)),
+                # Changed from ForeignKey to BigIntegerField since User uses raw SQL
+                ('user_id', models.BigIntegerField(db_column='user_id')),
             ],
             options={
                 'verbose_name': 'Booking',
