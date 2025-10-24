@@ -2,21 +2,26 @@ from django.contrib.auth.backends import BaseBackend
 from .models import User
 
 class AuthUserBackend(BaseBackend):
-    """Custom authentication backend for MongoDB User model"""
-    
+    """Custom authentication backend using raw SQL instead of Django ORM"""
+
     def authenticate(self, request, username=None, password=None, **kwargs):
-        """Authenticate user with username and password"""
+        """Authenticate user with username and password using raw SQL"""
         try:
-            user = User.objects.filter(username=username).first()
-            if user and user.check_password(password):
+            # User.authenticate uses raw SQL via db_utils.py
+            user = User.authenticate(username, password)
+            if user:
                 return user
-        except Exception:
+        except Exception as e:
+            # Log exception if needed
             return None
         return None
-    
+
     def get_user(self, user_id):
-        """Get user by ID"""
+        """Get user by ID using raw SQL"""
         try:
-            return User.objects.filter(id=user_id).first()
+            # User.objects().get() uses raw SQL via db_utils.py
+            return User.objects().get(id=user_id)
+        except User.DoesNotExist:
+            return None
         except Exception:
-            return None 
+            return None

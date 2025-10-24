@@ -26,8 +26,9 @@ def home_view(request):
     # Add stats for admin users
     if user and user.is_admin():
         try:
-            context['total_users'] = User.objects.count()
-            context['active_sessions'] = UserSession.objects.count()
+            from .db_utils import count_users, count_active_sessions
+            context['total_users'] = count_users()
+            context['active_sessions'] = count_active_sessions()
         except Exception:
             context['total_users'] = 0
             context['active_sessions'] = 0
@@ -115,9 +116,10 @@ def dashboard_view(request):
         return redirect('login')
     
     try:
-        # Get user statistics with error handling
-        total_users = User.objects.count()
-        active_sessions = UserSession.objects.count()
+        # Get user statistics with error handling using raw SQL
+        from .db_utils import count_users, count_active_sessions
+        total_users = count_users()
+        active_sessions = count_active_sessions()
     except Exception as e:
         messages.error(request, f'Lỗi kết nối cơ sở dữ liệu: {str(e)}')
         total_users = 0
@@ -138,17 +140,20 @@ def admin_dashboard_view(request):
     user = get_current_user(request)
     
     try:
-        # Get comprehensive statistics
-        total_users = User.objects.count()
-        active_sessions = UserSession.objects.count()
+        # Get comprehensive statistics using raw SQL
+        from .db_utils import count_users, count_active_sessions, count_users_by_role
+        total_users = count_users()
+        active_sessions = count_active_sessions()
         
         # Role statistics - simplified for only admin and user
         role_stats = {}
         for role_key, role_name in User.ROLES:
-            role_stats[role_name] = User.objects.filter(role=role_key).count()
+            role_stats[role_name] = count_users_by_role(role_key)
         
-        # Recent users
-        recent_users = User.objects.order_by('-date_joined')[:5]
+        # Recent users - get first 5 from all users
+        from .db_utils import get_all_users
+        recent_users_data = get_all_users()[:5]
+        recent_users = [User(**user_data) for user_data in recent_users_data]
         
     except Exception:
         total_users = active_sessions = 0
@@ -173,8 +178,10 @@ def users_management_view(request):
     user = get_current_user(request)
     
     try:
-        # Get all users for management
-        users = User.objects.order_by('-date_joined')
+        # Get all users for management using raw SQL
+        from .db_utils import get_all_users
+        users_data = get_all_users()
+        users = [User(**user_data) for user_data in users_data]
     except Exception:
         users = []
     
@@ -192,10 +199,13 @@ def edit_user_view(request, username):
     current_user = get_current_user(request)
     
     try:
-        target_user = User.objects.filter(username=username).first()
-    except User.DoesNotExist:
-        messages.error(request, 'Không tìm thấy người dùng.')
-        return redirect('users_management')
+        # Get user by username using raw SQL
+        from .db_utils import get_user_by_username
+        user_data = get_user_by_username(username)
+        if not user_data:
+            messages.error(request, 'Không tìm thấy người dùng.')
+            return redirect('users_management')
+        target_user = User(**user_data)
     except Exception as e:
         messages.error(request, f'Có lỗi xảy ra: {str(e)}')
         return redirect('users_management')
@@ -247,11 +257,12 @@ def api_change_user_role(request):
         if current_user.username == username:
             return JsonResponse({'error': 'Bạn không thể thay đổi vai trò của chính mình!'}, status=403)
         
-        # Find user
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
+        # Find user using raw SQL
+        from .db_utils import get_user_by_username
+        user_data = get_user_by_username(username)
+        if not user_data:
             return JsonResponse({'error': 'Không tìm thấy người dùng'}, status=404)
+        user = User(**user_data)
         
         # Check if user is already in that role
         if user.role == new_role:
@@ -314,10 +325,12 @@ def api_toggle_user_status(request):
         if current_user.username == username:
             return JsonResponse({'error': 'Bạn không thể thay đổi trạng thái hoạt động của chính mình!'}, status=403)
         
-        # Find user
-        user = User.objects.filter(username=username).first()
-        if not user:
+        # Find user using raw SQL
+        from .db_utils import get_user_by_username
+        user_data = get_user_by_username(username)
+        if not user_data:
             return JsonResponse({'error': 'Không tìm thấy người dùng'}, status=404)
+        user = User(**user_data)
         
         # Store old status info for logging
         old_status = "Hoạt động" if user.is_active else "Không hoạt động"
@@ -420,12 +433,11 @@ def api_profile_update(request):
                 if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', new_email):
                     return JsonResponse({'email': ['Email không hợp lệ']}, status=400)
 
-                try:
-                    existing_user = User.objects.get(email=new_email)
-                    if existing_user.id != user.id:
-                        return JsonResponse({'email': ['Email này đã được sử dụng']}, status=400)
-                except User.DoesNotExist:
-                    pass  
+                # Check if email exists for other users using raw SQL
+                from .db_utils import get_user_by_email
+                existing_user_data = get_user_by_email(new_email)
+                if existing_user_data and existing_user_data['id'] != user.id:
+                    return JsonResponse({'email': ['Email này đã được sử dụng']}, status=400)  
 
                 user.email = new_email
                 updated_fields.append('email')
@@ -468,20 +480,23 @@ def api_user_list(request):
         if not user.is_admin():
             return JsonResponse({'error': 'Chỉ admin mới có thể truy cập danh sách người dùng'}, status=403)
         
-        users = User.objects.all()
+        # Get all users using raw SQL
+        from .db_utils import get_all_users
+        users_data = get_all_users()
         
         user_list = []
-        for u in users:
+        for user_data in users_data:
+            user = User(**user_data)
             user_list.append({
-                'username': u.username,
-                'email': u.email,
-                'full_name': u.get_full_name(),
-                'role': u.get_role_display(),
-                'role_key': u.role,
-                'date_joined': u.date_joined.strftime('%d/%m/%Y %H:%M') if u.date_joined else '',
-                'last_login': u.last_login.strftime('%d/%m/%Y %H:%M') if u.last_login else 'Chưa đăng nhập',
-                'is_active': u.is_active,
-                'permissions': u.get_permissions_display()
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.get_full_name(),
+                'role': user.get_role_display(),
+                'role_key': user.role,
+                'date_joined': user.date_joined.strftime('%d/%m/%Y %H:%M') if user.date_joined else '',
+                'last_login': user.last_login.strftime('%d/%m/%Y %H:%M') if user.last_login else 'Chưa đăng nhập',
+                'is_active': user.is_active,
+                'permissions': user.get_permissions_display()
             })
         
         return JsonResponse({
