@@ -210,6 +210,11 @@ class User:
         return cls(**user_data) if user_data else None
 
     @classmethod
+    def get_by_id(cls, user_id):
+        """Get user by ID - returns dict for consistency with no-ORM models"""
+        return get_user_by_id(user_id)
+
+    @classmethod
     def objects(cls):
         """Return UserManager for ORM-like interface"""
         return UserManager()

@@ -58,10 +58,22 @@ class UserSession:
             return db_delete_user_session(self.user.username, self.session_key)
         return False
 
-    @classmethod
-    def objects(cls):
-        """Return UserSessionManager for ORM-like interface"""
-        return UserSessionManager()
+
+class UserSessionQuerySet:
+    """QuerySet-like wrapper for session results"""
+
+    def __init__(self, sessions):
+        self.sessions = sessions
+
+    def first(self):
+        """Return first session or None"""
+        return self.sessions[0] if self.sessions else None
+
+    def delete(self):
+        """Delete all sessions in the queryset"""
+        for session in self.sessions:
+            session.delete()
+        return len(self.sessions)
 
 
 class UserSessionManager:
@@ -71,19 +83,21 @@ class UserSessionManager:
         """Filter sessions by criteria - simplified implementation"""
         if 'user__username' in kwargs and 'session_key' in kwargs:
             session_data = db_get_user_session(kwargs['user__username'], kwargs['session_key'])
-            return [UserSession(**session_data)] if session_data else []
-        return []
+            sessions = [UserSession(**session_data)] if session_data else []
+            return UserSessionQuerySet(sessions)
+        return UserSessionQuerySet([])
 
     def get(self, **kwargs):
         """Get single session by criteria"""
-        sessions = self.filter(**kwargs)
-        if not sessions:
+        result = self.filter(**kwargs)
+        session = result.first()
+        if not session:
             raise UserSession.DoesNotExist("Session not found")
-        return sessions[0]
+        return session
 
     def all(self):
         """Get all sessions"""
-        return []
+        return UserSessionQuerySet([])
 
     def count(self):
         """Count active sessions"""
@@ -103,3 +117,6 @@ class DoesNotExist(Exception):
     pass
 
 UserSession.DoesNotExist = DoesNotExist
+
+# Add objects manager as class attribute
+UserSession.objects = UserSessionManager()

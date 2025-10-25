@@ -458,6 +458,27 @@ Cookie: sessionid={{session_id}}
 }
 ```
 
+**✅ TỰ ĐỘNG TẠO SEATS:**
+- **Seats được TỰ ĐỘNG TẠO** khi tạo Bus mới
+- Hệ thống tự động tạo đủ số ghế theo `total_seats`
+- **Quy tắc đặt tên ghế:** A01, A02, ..., A10, B01, B02, ..., B10, C01, ...
+  - Mỗi hàng (row) có tối đa 10 ghế
+  - Hàng A: ghế 1-10 (A01-A10)
+  - Hàng B: ghế 11-20 (B01-B10)
+  - Hàng C: ghế 21-30 (C01-C10), v.v.
+- Ví dụ: Bus 45 ghế → Tự động tạo A01-A10, B01-B10, C01-C10, D01-D10, E01-E05
+- Tất cả ghế mặc định `is_available = true`
+
+**Ví dụ kết quả:**
+```http
+POST /api/buses/
+{"license_plate": "29A-12345", "model": "Hyundai", "total_seats": 15, "manufacture_year": 2023}
+
+# Hệ thống tự động tạo 15 seats:
+# A01, A02, A03, A04, A05, A06, A07, A08, A09, A10
+# B01, B02, B03, B04, B05
+```
+
 ---
 
 ### 5.2 Danh sách Buses
@@ -490,7 +511,13 @@ Cookie: sessionid={{session_id}}
 
 ## 💺 6. TRANSPORT APIs - SEATS
 
-### 6.1 Tạo Seat
+**✅ TỰ ĐỘNG TẠO SEATS:**
+- Khi bạn tạo Bus, hệ thống **TỰ ĐỘNG** tạo tất cả seats theo `total_seats`
+- Seats được đặt tên theo quy tắc: A01-A10, B01-B10, C01-C10, ...
+- Bạn **KHÔNG CẦN** tạo seats thủ công nữa
+- API tạo seat vẫn có sẵn cho trường hợp cần thêm ghế đặc biệt
+
+### 6.1 Tạo Seat thủ công (Tùy chọn - nếu cần thêm ghế)
 
 **Endpoint:** `POST /api/seats/`
 
@@ -500,11 +527,11 @@ Content-Type: application/json
 Cookie: sessionid={{session_id}}
 ```
 
-**Request Body (theo `transport/serializers.py:33-39`):**
+**Request Body (theo `transport/serializers.py:105-119`):**
 ```json
 {
     "bus": 1,
-    "seat_number": "A01",
+    "seat_number": "VIP01",
     "is_available": true
 }
 ```
@@ -512,30 +539,39 @@ Cookie: sessionid={{session_id}}
 **Validation:**
 - `bus` phải tồn tại (Bus ID)
 - Unique constraint: không được trùng cặp (bus, seat_number)
+- `seat_number` phải unique trong cùng một bus
 
 **Response Example:**
 ```json
 {
-    "id": 1,
-    "seat_number": "A01",
+    "id": 46,
+    "seat_number": "VIP01",
     "bus": 1,
     "bus_license_plate": "29A-12345",
     "is_available": true
 }
 ```
 
-**Lưu ý:** Cần tạo đủ số ghế cho mỗi xe (theo `total_seats` của Bus)
+**💡 Khi nào cần tạo seat thủ công?**
+- Thêm ghế VIP đặc biệt
+- Thêm ghế nằm (sleeper)
+- Ghế có tên đặc biệt khác với quy tắc A01-Z99
 
-**Ví dụ tạo nhiều ghế:**
-```json
-// Seat A01
-{"bus": 1, "seat_number": "A01", "is_available": true}
+**Ví dụ: Thêm ghế VIP sau khi Bus đã tạo xong:**
+```http
+# Bus đã tự động tạo A01-E05 (45 ghế)
+# Giờ thêm 2 ghế VIP:
 
-// Seat A02
-{"bus": 1, "seat_number": "A02", "is_available": true}
+POST /api/seats/
+{"bus": 1, "seat_number": "VIP01", "is_available": true}
 
-// ... tạo tiếp cho đến A45 (nếu bus có 45 ghế)
+POST /api/seats/
+{"bus": 1, "seat_number": "VIP02", "is_available": true}
 ```
+
+**⚠️ Lưu ý:**
+- Seats thông thường đã được tạo tự động khi tạo Bus
+- Chỉ cần API này nếu muốn thêm ghế đặc biệt
 
 ---
 
@@ -585,8 +621,8 @@ Cookie: sessionid={{session_id}}
 {
     "route": 1,
     "bus": 1,
-    "departure_time": "2025-02-01T08:00:00Z",
-    "arrival_time": "2025-02-02T08:00:00Z",
+    "departure_time": "2025-12-11T08:00:00Z",
+    "arrival_time": "2025-12-12T08:00:00Z",
     "price_per_seat": 350000
 }
 ```
@@ -605,8 +641,8 @@ Cookie: sessionid={{session_id}}
     "route_info": "Bến xe Mỹ Đình → Bến xe Miền Đông (1700.5 km)",
     "bus": 1,
     "bus_license_plate": "29A-12345",
-    "departure_time": "2025-02-01T08:00:00Z",
-    "arrival_time": "2025-02-02T08:00:00Z",
+    "departure_time": "2025-12-11T08:00:00Z",
+    "arrival_time": "2025-12-12T08:00:00Z",
     "price_per_seat": 350000,
     "duration": "24 hours",
     "available_seats_count": 45,
@@ -1046,17 +1082,26 @@ Content-Type: application/json
 }
 ```
 
-**Bước 6: Tạo Seats cho Bus (ví dụ 3 ghế đầu)**
+**Bước 6: Kiểm tra Seats đã tự động tạo (✅ TỰ ĐỘNG)**
 ```http
-POST /api/seats/
-{"bus": 1, "seat_number": "A01", "is_available": true}
+# Seats đã được TỰ ĐỘNG TẠO khi tạo Bus ở Bước 5!
+# Kiểm tra danh sách seats của bus:
 
-POST /api/seats/
-{"bus": 1, "seat_number": "A02", "is_available": true}
+GET /api/seats/?bus=1
 
-POST /api/seats/
-{"bus": 1, "seat_number": "A03", "is_available": true}
+# Response sẽ trả về 45 seats tự động:
+# [
+#   {"id": 1, "seat_number": "A01", "bus": 1, ...},
+#   {"id": 2, "seat_number": "A02", "bus": 1, ...},
+#   ...
+#   {"id": 45, "seat_number": "E05", "bus": 1, ...}
+# ]
 ```
+
+**Pattern ghế tự động:**
+- Bus 45 ghế → A01-A10, B01-B10, C01-C10, D01-D10, E01-E05
+- Bus 15 ghế → A01-A10, B01-B05
+- Bus 30 ghế → A01-A10, B01-B10, C01-C10
 
 **Bước 7: Tạo Trip (upcoming)**
 ```http
@@ -1359,8 +1404,11 @@ Content-Type: application/json
 ### Test Transport (theo thứ tự):
 - [ ] Create 2 Locations
 - [ ] Create Route từ 2 locations
-- [ ] Create Bus
-- [ ] Create ít nhất 3 Seats cho Bus
+- [ ] Create Bus (✅ seats tự động tạo!)
+- [ ] **Verify seats đã tự động tạo:** `GET /api/seats/?bus={bus_id}`
+  - [ ] Kiểm tra số lượng seats khớp với `total_seats`
+  - [ ] Kiểm tra pattern đặt tên: A01-A10, B01-B10, ...
+  - [ ] Tất cả seats có `is_available = true`
 - [ ] Create Trip với datetime trong tương lai
 - [ ] Check available seats
 
@@ -1394,8 +1442,8 @@ Hướng dẫn này bao gồm:
 1. Authentication (Register → Login)
 2. Locations (tạo 2 locations)
 3. Routes (tạo route từ 2 locations)
-4. Buses (tạo bus)
-5. Seats (tạo seats cho bus)
+4. Buses (tạo bus - **✅ seats tự động tạo theo total_seats!**)
+5. ~~Seats~~ (KHÔNG cần tạo thủ công - đã tự động!)
 6. Trips (tạo trip từ route + bus)
 7. Bookings (tạo booking với seats)
 
