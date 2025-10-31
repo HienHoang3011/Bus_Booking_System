@@ -10,6 +10,7 @@ urlpatterns = [
     path('oauth/', include('social_django.urls', namespace='social')),
     path('api/', include('transport.urls')),
     path('', include('bookings.urls')),
+    path('', include('payments.urls'))
 ]
 
 if settings.DEBUG:

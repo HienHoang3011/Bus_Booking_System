@@ -18,181 +18,149 @@ class Payment:
 
     TABLE_NAME = 'payments'
     PAYMENT_METHODS = [
-        ('Credit Card', 'Thẻ tín dụng'),
-        ('PayPal', 'PayPal'),
-        ('Bank Transfer', 'Chuyển khoản ngân hàng'),
+        ('Momo', 'Momo'),
+        ('VNPay', 'VNPay'),
+        ('ZaloPay', 'ZaloPay'),
+        ('ViettelPay','ViettelPay'),
+        ('MBbank','Ngân hàng Quân đội'),
+        ('Techcombank', 'Ngân hàng TMCP Kỹ thương Việt Nam'),
+        ('Agribank', 'Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam'),
+        ('Vietcombank', 'Ngân hàng TMCP Ngoại thương Việt Nam'),
+        ('Vietinbank', 'Ngân hàng TMCP Công thương Việt Nam')
     ]
     STATUS_CHOICES = [
         ('Pending', 'Chờ xử lý'),
         ('Completed', 'Hoàn thành'),
-        ('Failed', 'Thất bại'),
     ]
-
+    
     @classmethod
     def create(cls, booking_id: str, amount: Decimal, payment_method: str,
-               transaction_code: str, status: str = 'Pending') -> Dict[str, Any]:
+               transaction_code: str, wallet_id: Optional[str] = None,
+               status: str = 'Pending') -> Optional[Dict[str, Any]]:
         """Create a new payment"""
         payment_id = str(uuid.uuid4())
         payment_time = now()
 
         query = f"""
             INSERT INTO {cls.TABLE_NAME}
-            (id, booking_id, amount, payment_method, transaction_code, status, payment_time)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, booking_id, amount, payment_method, transaction_code, status, payment_time
+            (id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id
         """
         result = execute_query(query, (payment_id, booking_id, amount, payment_method,
-                                      transaction_code, status, payment_time))
+                                      status, payment_time, transaction_code, wallet_id))
         return result[0] if result else None
 
     @classmethod
-    def get_by_id(cls, payment_id: str) -> Optional[Dict[str, Any]]:
-        """Get payment by ID with booking details"""
-        query = f"""
-            SELECT
-                p.id, p.booking_id, p.amount, p.payment_method, p.transaction_code,
-                p.status, p.payment_time,
-                b.user_id, b.trip_id, b.number_of_seats, b.total_amount as booking_amount,
-                b.booking_time, b.status as booking_status
-            FROM {cls.TABLE_NAME} p
-            JOIN bookings b ON p.booking_id = b.id
-            WHERE p.id = %s
-        """
+    def mark_as_completed(cls, payment_id: int) -> bool:
+        query = f"UPDATE {cls.TABLE_NAME} SET status = %s WHERE id = %s"
+        return execute_update(query, ('Completed', payment_id))
+
+    @classmethod
+    def check_payment_state(cls, payment_id: int) -> bool:
+        query = f"SELECT status FROM {cls.TABLE_NAME} WHERE id = %s"
+        result = execute_query_one(query, (payment_id,))
+        return result and result.get('status') == 'Completed'
+
+    @classmethod
+    def get_payment(cls, payment_id: int) -> Optional[Dict[str, Any]]:
+        """Display payment details by payment_id"""
+        query = f"SELECT id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id FROM {cls.TABLE_NAME} WHERE id = %s"
         return execute_query_one(query, (payment_id,))
 
+class Wallet:
+    TABLE_NAME = 'wallets'
+    TRANSACTION_TYPES = [
+        ('deposit', 'Nạp tiền'),
+        ('withdraw', 'Rút tiền'),
+        ('payment', 'Thanh toán vé xe'),
+        ('refund', 'Hoàn tiền'),
+        ('receive', 'Nhận tiền'),
+    ]
     @classmethod
-    def get_all(cls, booking_id: str = None, status: str = None,
-                payment_method: str = None, ordering: List[str] = None) -> List[Dict[str, Any]]:
-        """Get all payments with optional filters"""
-        conditions = []
-        params = []
+    def create(cls, user_id: int, balance: Decimal = Decimal('0.00')) -> Optional[Dict[str, Any]]:
+        """Create a new wallet for a user"""
+        existing_wallet = cls.get_by_user_id(user_id)
+        if existing_wallet:
+            return existing_wallet
 
-        if booking_id is not None:
-            conditions.append("p.booking_id = %s")
-            params.append(booking_id)
-        if status:
-            conditions.append("p.status = %s")
-            params.append(status)
-        if payment_method:
-            conditions.append("p.payment_method = %s")
-            params.append(payment_method)
-
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        order_clause = build_order_clause(ordering or ['-payment_time'])
-
+        wallet_id = str(uuid.uuid4())
+        created_at = now()
+        
         query = f"""
-            SELECT
-                p.id, p.booking_id, p.amount, p.payment_method, p.transaction_code,
-                p.status, p.payment_time,
-                b.user_id, b.trip_id, b.number_of_seats, b.total_amount as booking_amount,
-                b.booking_time, b.status as booking_status
-            FROM {cls.TABLE_NAME} p
-            JOIN bookings b ON p.booking_id = b.id
-            {where_clause}
-            {order_clause}
+            INSERT INTO {cls.TABLE_NAME}
+            (id, user_id, balance, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s)
         """
-
-        return execute_query(query, tuple(params))
+        success = execute_insert(query, (wallet_id, user_id, balance, created_at, created_at))
+        
+        if success:
+            select_query = f"SELECT id, user_id, balance, created_at, updated_at FROM {cls.TABLE_NAME} WHERE id = %s"
+            return execute_query_one(select_query, (wallet_id,))
+        return None
 
     @classmethod
-    def get_by_booking_id(cls, booking_id: str) -> List[Dict[str, Any]]:
-        """Get all payments for a booking"""
-        return cls.get_all(booking_id=booking_id)
+    def get_by_user_id(cls, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get a wallet by user ID."""
+        query = f"SELECT id, user_id, balance, created_at, updated_at FROM {cls.TABLE_NAME} WHERE user_id = %s"
+        return execute_query_one(query, (user_id,))
 
     @classmethod
-    def update(cls, payment_id: str, amount: Decimal = None, payment_method: str = None,
-               status: str = None, transaction_code: str = None) -> bool:
-        """Update a payment"""
-        updates = []
-        params = []
+    def get_balance(cls, user_id: int) -> Optional[Decimal]:
+        """Get wallet balance by user ID"""
+        query = f"SELECT balance FROM {cls.TABLE_NAME} WHERE user_id = %s"
+        result = execute_query_one(query, (user_id,))
+        return result['balance'] if result else None
 
-        if amount is not None:
-            updates.append("amount = %s")
-            params.append(amount)
-        if payment_method is not None:
-            updates.append("payment_method = %s")
-            params.append(payment_method)
-        if status is not None:
-            updates.append("status = %s")
-            params.append(status)
-        if transaction_code is not None:
-            updates.append("transaction_code = %s")
-            params.append(transaction_code)
-
-        if not updates:
+    @classmethod
+    def deposit(cls, user_id: int, amount: Decimal) -> bool:
+        """Update wallet balance: depositing"""
+        if amount < Decimal('0.00'):
             return False
-
-        params.append(payment_id)
-        query = f"UPDATE {cls.TABLE_NAME} SET {', '.join(updates)} WHERE id = %s"
-        return execute_update(query, tuple(params)) > 0
+        query = f"UPDATE {cls.TABLE_NAME} SET balance = %s, updated_at = %s WHERE user_id = %s"
+        wallet = cls.get_by_user_id(user_id)
+        new_balance = wallet['balance'] + amount
+        return execute_update(query, (new_balance, now(), user_id))
+    
+    @classmethod
+    def withdraw(cls, user_id: str, amount: Decimal) -> bool:
+        """Update wallet balance: withdrawing"""
+        wallet = cls.get_by_user_id(user_id)
+        if amount == Decimal('0.00') or amount > wallet['balance']:
+            return False
+        query = f"UPDATE {cls.TABLE_NAME} SET balance = %s, updated_at = %s WHERE user_id = %s"
+        new_balance = wallet['balance'] - amount
+        return execute_update(query, (new_balance, now(), user_id))
+    
+    @classmethod
+    def pay(cls, user_id: str, admin_id: str, amount: Decimal) -> bool:
+        """Make a payment from user wallet to admin wallet"""
+        user_wallet = cls.get_by_user_id(user_id)
+        admin_wallet = cls.get_by_user_id(admin_id)
+        
+        if not user_wallet or not admin_wallet:
+            return False
+        if amount <= Decimal('0.00') or amount > user_wallet['balance']:
+            return False
+        
+        # Withdraw from user and deposit to admin
+        if cls.withdraw(user_id, amount):
+            return cls.deposit(admin_id, amount)
+        return False
 
     @classmethod
-    def delete(cls, payment_id: str) -> bool:
-        """Delete a payment"""
-        query = f"DELETE FROM {cls.TABLE_NAME} WHERE id = %s"
-        return execute_delete(query, (payment_id,)) > 0
-
-    @classmethod
-    def mark_as_completed(cls, payment_id: str) -> bool:
-        """Mark the payment as completed"""
-        return cls.update(payment_id, status='Completed')
-
-    @classmethod
-    def mark_as_failed(cls, payment_id: str) -> bool:
-        """Mark the payment as failed"""
-        return cls.update(payment_id, status='Failed')
-
-    @classmethod
-    def is_successful(cls, payment: Dict[str, Any]) -> bool:
-        """Check if the payment was successful"""
-        return payment['status'] == 'Completed'
-
-    @classmethod
-    def create_payment_summary(cls, payment: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a summary of the payment details"""
-        return {
-            'payment_id': payment['id'],
-            'booking_id': payment['booking_id'],
-            'amount': float(payment['amount']),
-            'payment_method': cls.get_payment_method_display(payment['payment_method']),
-            'status': cls.get_status_display(payment['status']),
-            'payment_time': payment['payment_time'].strftime('%Y-%m-%d %H:%M:%S') if isinstance(payment['payment_time'], datetime) else str(payment['payment_time']),
-            'transaction_code': payment['transaction_code'],
-        }
-
-    @classmethod
-    def get_payment_method_display(cls, payment_method: str) -> str:
-        """Get display text for payment method"""
-        for choice in cls.PAYMENT_METHODS:
-            if choice[0] == payment_method:
-                return choice[1]
-        return payment_method
-
-    @classmethod
-    def get_status_display(cls, status: str) -> str:
-        """Get display text for status"""
-        for choice in cls.STATUS_CHOICES:
-            if choice[0] == status:
-                return choice[1]
-        return status
-
-    @classmethod
-    def get_statistics(cls) -> Dict[str, Any]:
-        """Get payment statistics"""
+    def get_all_payments(cls, wallet_id: str) -> List[Dict[str, Any]]:
+        """Get all payments for a wallet (order by latest time)"""
         query = f"""
-            SELECT
-                COUNT(*) as total_payments,
-                COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_payments,
-                COUNT(CASE WHEN status = 'Completed' THEN 1 END) as completed_payments,
-                COUNT(CASE WHEN status = 'Failed' THEN 1 END) as failed_payments,
-                COALESCE(SUM(CASE WHEN status = 'Completed' THEN amount ELSE 0 END), 0) as total_revenue
-            FROM {cls.TABLE_NAME}
+            SELECT id, booking_id, wallet_id, amount, payment_method, status, payment_time, transaction_code 
+            FROM {Payment.TABLE_NAME} 
+            WHERE wallet_id = %s
+            ORDER BY payment_time DESC
         """
-        result = execute_query_one(query)
-        return result if result else {
-            'total_payments': 0,
-            'pending_payments': 0,
-            'completed_payments': 0,
-            'failed_payments': 0,
-            'total_revenue': 0
-        }
+        return execute_query(query, (wallet_id,))
+
+    
+
+        
+
+
