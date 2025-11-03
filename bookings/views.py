@@ -29,8 +29,8 @@ class BookingViewSet(viewsets.ViewSet):
     - GET /api/bookings/my-bookings/ - Get current user's bookings
     """
 
-    # Use UUID regex to prevent action names from being matched as pk
-    lookup_value_regex = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    # Use integer regex to match booking IDs
+    lookup_value_regex = '[0-9]+'
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -162,7 +162,7 @@ class BookingViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """Cancel a booking"""
+        """Cancel and completely remove a booking"""
         booking = Booking.get_by_id(pk)
         if not booking:
             raise NotFound('Booking not found')
@@ -180,10 +180,17 @@ class BookingViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Cancel booking (this will delete booking, tickets, and payments)
         Booking.cancel_booking(pk)
-        updated_booking = Booking.get_by_id(pk)
-        serializer = BookingSerializer(updated_booking)
-        return Response(serializer.data)
+
+        return Response(
+            {
+                'success': True,
+                'message': 'Booking canceled and removed successfully.',
+                'booking_id': pk
+            },
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=False, methods=['get'], url_path='my-bookings')
     def my_bookings(self, request):

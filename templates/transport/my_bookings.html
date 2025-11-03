@@ -1,0 +1,213 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Vé của tôi - ReHearten{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12 mb-4">
+            <h2><i class="fas fa-ticket-alt me-2"></i>Vé của tôi</h2>
+            <p class="text-muted">Danh sách các vé xe bạn đã đặt</p>
+        </div>
+    </div>
+
+    {% if bookings %}
+    <div class="row">
+        {% for booking in bookings %}
+        <div class="col-md-6 mb-4">
+            <div class="card booking-card {% if booking.status == 'Confirmed' %}border-success{% elif booking.status == 'Pending' %}border-warning{% else %}border-secondary{% endif %}">
+                <div class="card-header {% if booking.status == 'Confirmed' %}bg-success{% elif booking.status == 'Pending' %}bg-warning{% else %}bg-secondary{% endif %} text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bus me-2"></i>Mã đặt vé: #{{ booking.id }}
+                        </h5>
+                        <span class="badge bg-white text-dark">
+                            {% if booking.status == 'Pending' %}
+                                Chờ xử lý
+                            {% elif booking.status == 'Confirmed' %}
+                                Đã xác nhận
+                            {% else %}
+                                Đã hủy
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Route Information -->
+                    <div class="route-info mb-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="text-center">
+                                <div class="text-muted small">Điểm đi</div>
+                                <h6 class="mb-0">{{ booking.start_location_name }}</h6>
+                                <small class="text-muted">{{ booking.start_location_city }}</small>
+                            </div>
+                            <div>
+                                <i class="fas fa-arrow-right text-primary fa-2x"></i>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-muted small">Điểm đến</div>
+                                <h6 class="mb-0">{{ booking.end_location_name }}</h6>
+                                <small class="text-muted">{{ booking.end_location_city }}</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Trip Details -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>Ngày khởi hành
+                            </small>
+                            <div class="fw-bold">{{ booking.departure_time|date:"d/m/Y" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>Giờ khởi hành
+                            </small>
+                            <div class="fw-bold">{{ booking.departure_time|time:"H:i" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <i class="fas fa-bus me-1"></i>Xe
+                            </small>
+                            <div class="fw-bold">{{ booking.bus_license_plate }}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <i class="fas fa-chair me-1"></i>Số ghế
+                            </small>
+                            <div class="fw-bold">{{ booking.number_of_seats }} ghế</div>
+                        </div>
+                    </div>
+
+                    <!-- Seat Numbers -->
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            <i class="fas fa-couch me-1"></i>Ghế đã đặt
+                        </small>
+                        <div>
+                            {% for ticket in booking.tickets %}
+                                <span class="badge bg-primary me-1 mb-1">{{ ticket.seat_number }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Passengers -->
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            <i class="fas fa-users me-1"></i>Hành khách
+                        </small>
+                        <div>
+                            {% for ticket in booking.tickets %}
+                                <div class="small">{{ forloop.counter }}. {{ ticket.passenger_name }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Price -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="fw-bold">Tổng tiền:</span>
+                        <span class="h5 text-success mb-0">{{ booking.total_amount|floatformat:0 }} ₫</span>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex gap-2">
+                        <a href="/booking/{{ booking.id }}/confirmation/" class="btn btn-outline-primary btn-sm flex-fill">
+                            <i class="fas fa-eye me-1"></i>Chi tiết
+                        </a>
+                        {% if booking.status == 'Pending' %}
+                        <button class="btn btn-outline-danger btn-sm" onclick="cancelBooking({{ booking.id }})">
+                            <i class="fas fa-times me-1"></i>Hủy vé
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer text-muted small">
+                    <i class="fas fa-clock me-1"></i>Đặt lúc: {{ booking.booking_time|date:"d/m/Y H:i" }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-ticket-alt fa-5x text-muted mb-3"></i>
+                    <h4 class="text-muted">Bạn chưa đặt vé nào</h4>
+                    <p class="text-muted">Hãy đặt vé cho chuyến đi của bạn!</p>
+                    <a href="/trips/" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Tìm chuyến xe
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .booking-card {
+        transition: all 0.3s ease;
+    }
+
+    .booking-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .route-info {
+        background: linear-gradient(135deg, #f0f9ff, #dbeafe);
+        padding: 15px;
+        border-radius: 10px;
+    }
+</style>
+
+<script>
+function cancelBooking(bookingId) {
+    if (confirm('Bạn có chắc chắn muốn hủy vé này?')) {
+        fetch(`/api/bookings/${bookingId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Vé đã được hủy thành công');
+                window.location.reload();
+            } else {
+                alert('Lỗi: ' + (data.error || 'Không thể hủy vé'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Có lỗi xảy ra khi hủy vé');
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

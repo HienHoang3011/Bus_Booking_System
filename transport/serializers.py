@@ -166,15 +166,28 @@ class TripSerializer(serializers.Serializer):
     """Serializer for Trip dictionary data"""
     id = serializers.IntegerField(read_only=True)
     route = serializers.IntegerField(source='route_id', required=True)
+    route_id = serializers.IntegerField(read_only=True)
     route_info = serializers.SerializerMethodField(read_only=True)
     bus = serializers.IntegerField(source='bus_id', required=True)
+    bus_id = serializers.IntegerField(read_only=True)
     bus_license_plate = serializers.CharField(read_only=True)
+    bus_model = serializers.CharField(read_only=True)
+    bus_total_seats = serializers.IntegerField(read_only=True)
+    bus_manufacture_year = serializers.IntegerField(read_only=True)
     departure_time = serializers.DateTimeField(required=True)
     arrival_time = serializers.DateTimeField(required=True)
     price_per_seat = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     duration = serializers.SerializerMethodField(read_only=True)
     available_seats_count = serializers.SerializerMethodField(read_only=True)
     is_upcoming = serializers.SerializerMethodField(read_only=True)
+    # Location fields
+    start_location_id = serializers.IntegerField(read_only=True)
+    start_location_name = serializers.CharField(read_only=True)
+    start_location_city = serializers.CharField(read_only=True)
+    end_location_id = serializers.IntegerField(read_only=True)
+    end_location_name = serializers.CharField(read_only=True)
+    end_location_city = serializers.CharField(read_only=True)
+    distance_km = serializers.FloatField(read_only=True)
 
     def get_route_info(self, obj):
         """Get route info"""

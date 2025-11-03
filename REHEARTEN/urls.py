@@ -8,6 +8,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('accounts.urls')),
     path('oauth/', include('social_django.urls', namespace='social')),
+    # Frontend booking pages
+    path('', include('transport.urls_frontend')),
+    # REST API endpoints
     path('api/', include('transport.urls')),
     path('', include('bookings.urls')),
     path('', include('payments.urls'))

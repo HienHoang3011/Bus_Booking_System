@@ -1,0 +1,423 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Xác nhận đặt vé - ReHearten{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <!-- Success Message -->
+            <div class="card border-success mb-4">
+                <div class="card-body text-center py-5">
+                    <div class="success-icon mb-3">
+                        <i class="fas fa-check-circle fa-5x text-success"></i>
+                    </div>
+                    <h2 class="text-success mb-3">Đặt vé thành công!</h2>
+                    <p class="lead">Cảm ơn bạn đã sử dụng dịch vụ của ReHearten</p>
+                    <p class="text-muted">Mã đặt vé: <strong class="text-primary">{{ booking.id }}</strong></p>
+
+                    {% if is_guest %}
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Bạn đang đặt vé với tư cách khách.
+                        <a href="/register/" class="alert-link">Đăng ký tài khoản</a> hoặc
+                        <a href="/login/" class="alert-link">đăng nhập</a> để quản lý đặt vé của bạn.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Trip Information -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bus me-2"></i>Thông tin chuyến xe
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="trip-route-big mb-4">
+                        <div class="location-box">
+                            <div class="text-muted mb-2">Điểm đi</div>
+                            <h5 class="mb-0">{{ booking.start_location_name }}</h5>
+                            <small>{{ booking.start_location_city }}</small>
+                        </div>
+                        <i class="fas fa-arrow-right route-arrow-big"></i>
+                        <div class="location-box">
+                            <div class="text-muted mb-2">Điểm đến</div>
+                            <h5 class="mb-0">{{ booking.end_location_name }}</h5>
+                            <small>{{ booking.end_location_city }}</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <i class="fas fa-calendar text-primary me-2"></i>
+                                <strong>Ngày khởi hành:</strong><br>
+                                <span class="ms-4">{{ booking.departure_time|date:"l, d/m/Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <i class="fas fa-clock text-primary me-2"></i>
+                                <strong>Giờ khởi hành:</strong><br>
+                                <span class="ms-4">{{ booking.departure_time|time:"H:i" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <i class="fas fa-bus text-primary me-2"></i>
+                                <strong>Xe:</strong><br>
+                                <span class="ms-4">{{ booking.bus_model }} ({{ booking.bus_license_plate }})</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <i class="fas fa-route text-primary me-2"></i>
+                                <strong>Quãng đường:</strong><br>
+                                <span class="ms-4">{{ booking.distance_km }} km</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ticket Details -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-ticket-alt me-2"></i>Chi tiết vé
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Số ghế</th>
+                                    <th>Hành khách</th>
+                                    <th class="text-end">Giá vé</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ticket in tickets %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">
+                                            {{ ticket.seat_number }}
+                                        </span>
+                                    </td>
+                                    <td>{{ ticket.passenger_name }}</td>
+                                    <td class="text-end">{{ ticket.price|floatformat:0 }} ₫</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Booking Summary -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-invoice me-2"></i>Tổng kết đặt vé
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Số lượng ghế:</strong>
+                                <span class="float-end">{{ booking.number_of_seats }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Giá mỗi ghế:</strong>
+                                <span class="float-end">{{ booking.price_per_seat|floatformat:0 }} ₫</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Thời gian đặt:</strong>
+                                <span class="float-end">{{ booking.booking_time|date:"d/m/Y H:i" }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Trạng thái:</strong>
+                                <span class="float-end">
+                                    {% if booking.status == 'Pending' %}
+                                        <span class="badge bg-warning">Chờ xử lý</span>
+                                    {% elif booking.status == 'Confirmed' %}
+                                        <span class="badge bg-success">Đã xác nhận</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Đã hủy</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Tổng tiền:</h5>
+                        <h3 class="text-primary mb-0">{{ booking.total_amount|floatformat:0 }} ₫</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Information -->
+            {% if payment %}
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-credit-card me-2"></i>Thông tin thanh toán
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Mã giao dịch:</strong>
+                                <span class="float-end">
+                                    <code>{{ payment.transaction_code }}</code>
+                                </span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Số tiền:</strong>
+                                <span class="float-end text-success fw-bold">
+                                    {{ payment.amount|floatformat:0 }} ₫
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Phương thức:</strong>
+                                <span class="float-end">
+                                    {% if payment.payment_method == 'Pending' %}
+                                        <span class="badge bg-warning">Chưa chọn</span>
+                                    {% else %}
+                                        <span class="badge bg-info">{{ payment.payment_method }}</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Trạng thái:</strong>
+                                <span class="float-end">
+                                    {% if payment.status == 'Pending' %}
+                                        <span class="badge bg-warning">Chờ thanh toán</span>
+                                    {% elif payment.status == 'Completed' %}
+                                        <span class="badge bg-success">Đã thanh toán</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Thất bại</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if payment.status == 'Pending' %}
+                    <hr>
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Vui lòng chọn phương thức thanh toán và hoàn tất thanh toán để xác nhận đặt vé.
+                    </div>
+
+                    <!-- Payment Method Selection -->
+                    <h6 class="mb-3">Chọn phương thức thanh toán:</h6>
+                    <div class="row g-2">
+                        {% for method_code, method_name in payment_methods %}
+                        <div class="col-md-4 col-sm-6">
+                            <button class="btn btn-outline-primary w-100 payment-method-btn"
+                                    data-method="{{ method_code }}"
+                                    data-payment-id="{{ payment.id }}">
+                                <i class="fas fa-wallet me-2"></i>{{ method_name }}
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h6 class="mb-3">Bước tiếp theo</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <a href="/trips/" class="btn btn-secondary w-100">
+                                <i class="fas fa-list me-2"></i>Xem chuyến xe khác
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="/dashboard/" class="btn btn-primary w-100">
+                                <i class="fas fa-columns me-2"></i>Về Dashboard
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-success w-100" onclick="window.print()">
+                                <i class="fas fa-print me-2"></i>In vé
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Important Notes -->
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Lưu ý quan trọng
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Vui lòng có mặt tại điểm đón trước giờ xuất phát ít nhất 15 phút</li>
+                        <li>Mang theo CMND/CCCD hoặc giấy tờ tùy thân khi lên xe</li>
+                        <li>Mã đặt vé sẽ được gửi qua email của bạn</li>
+                        <li>Nếu cần hỗ trợ, vui lòng liên hệ hotline: 1900-xxxx</li>
+                        <li>Để hủy hoặc thay đổi vé, vui lòng liên hệ trước giờ khởi hành 24 giờ</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .success-icon {
+        animation: scaleIn 0.5s ease-out;
+    }
+
+    @keyframes scaleIn {
+        from {
+            transform: scale(0);
+            opacity: 0;
+        }
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .trip-route-big {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .location-box {
+        flex: 1;
+        background: linear-gradient(135deg, #f0f9ff, #dbeafe);
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+    .route-arrow-big {
+        font-size: 2rem;
+        color: #0ea5e9;
+    }
+
+    .info-item {
+        padding: 10px;
+        background: #f8fafc;
+        border-radius: 8px;
+    }
+
+    @media print {
+        .btn, .card-header, nav, .alert {
+            display: none !important;
+        }
+
+        .card {
+            border: 1px solid #000 !important;
+            box-shadow: none !important;
+        }
+    }
+
+    .payment-method-btn {
+        transition: all 0.3s ease;
+    }
+
+    .payment-method-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .payment-method-btn.selected {
+        background: linear-gradient(135deg, #0284c7, #38bdf8);
+        color: white;
+        border-color: #0284c7;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentMethodBtns = document.querySelectorAll('.payment-method-btn');
+
+    paymentMethodBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const paymentMethod = this.getAttribute('data-method');
+            const paymentId = this.getAttribute('data-payment-id');
+
+            // Visual feedback
+            paymentMethodBtns.forEach(b => b.classList.remove('selected'));
+            this.classList.add('selected');
+
+            // Show confirmation dialog
+            if (confirm(`Xác nhận thanh toán bằng ${this.textContent.trim()}?`)) {
+                // Update payment method
+                updatePaymentMethod(paymentId, paymentMethod);
+            } else {
+                this.classList.remove('selected');
+            }
+        });
+    });
+
+    function updatePaymentMethod(paymentId, paymentMethod) {
+        fetch(`/payment/${paymentId}/update-method/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                payment_method: paymentMethod
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Phương thức thanh toán đã được cập nhật! Vui lòng hoàn tất thanh toán.');
+                // Optionally redirect to payment gateway
+                window.location.reload();
+            } else {
+                alert('Lỗi: ' + (data.error || 'Không thể cập nhật phương thức thanh toán'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Có lỗi xảy ra khi cập nhật phương thức thanh toán');
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}

@@ -27,7 +27,6 @@ class Booking:
     def create(cls, user_id: int, trip_id: int, number_of_seats: int,
                total_amount: Decimal = None, status: str = 'Pending') -> Dict[str, Any]:
         """Create a new booking"""
-        booking_id = str(uuid.uuid4())
         booking_time = now()
 
         # Auto-calculate total_amount if not provided
@@ -37,18 +36,19 @@ class Booking:
             if trip:
                 total_amount = number_of_seats * trip['price_per_seat']
 
+        # Use DEFAULT for id to let PostgreSQL auto-generate it
         query = f"""
             INSERT INTO {cls.TABLE_NAME}
-            (id, number_of_seats, total_amount, booking_time, status, trip_id, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (number_of_seats, total_amount, booking_time, status, trip_id, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id, user_id, trip_id, number_of_seats, total_amount, booking_time, status
         """
-        result = execute_query(query, (booking_id, number_of_seats, total_amount,
+        result = execute_query(query, (number_of_seats, total_amount,
                                       booking_time, status, trip_id, user_id))
         return result[0] if result else None
 
     @classmethod
-    def get_by_id(cls, booking_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(cls, booking_id: int) -> Optional[Dict[str, Any]]:
         """Get booking by ID with full details"""
         query = f"""
             SELECT
@@ -113,7 +113,7 @@ class Booking:
         return execute_query(query, tuple(params))
 
     @classmethod
-    def update(cls, booking_id: str, number_of_seats: int = None,
+    def update(cls, booking_id: int, number_of_seats: int = None,
                total_amount: Decimal = None, status: str = None) -> bool:
         """Update a booking"""
         updates = []
@@ -137,18 +137,37 @@ class Booking:
         return execute_update(query, tuple(params)) > 0
 
     @classmethod
-    def delete(cls, booking_id: str) -> bool:
+    def delete(cls, booking_id: int) -> bool:
         """Delete a booking"""
         query = f"DELETE FROM {cls.TABLE_NAME} WHERE id = %s"
         return execute_delete(query, (booking_id,)) > 0
 
     @classmethod
-    def cancel_booking(cls, booking_id: str) -> bool:
-        """Cancel the booking if it's not already canceled"""
-        return cls.update(booking_id, status='Canceled')
+    def cancel_booking(cls, booking_id: int) -> bool:
+        """Cancel the booking, reset seats, delete tickets and remove booking record"""
+        # First, get all tickets for this booking to find seat IDs
+        tickets = Ticket.get_by_booking_id(booking_id)
+
+        # Reset all seats to available and delete tickets
+        if tickets:
+            from transport.models import Seat
+            for ticket in tickets:
+                # Reset seat to available
+                Seat.update(ticket['seat_id'], is_available=True)
+                # Delete the ticket
+                Ticket.delete(ticket['id'])
+
+        # Delete any associated payments
+        from payments.models import Payment
+        payment = Payment.get_by_booking_id(booking_id)
+        if payment:
+            Payment.delete(payment['id'])
+
+        # Delete the booking record entirely
+        return cls.delete(booking_id)
 
     @classmethod
-    def confirm_booking(cls, booking_id: str) -> bool:
+    def confirm_booking(cls, booking_id: int) -> bool:
         """Confirm the booking if it's pending"""
         booking = cls.get_by_id(booking_id)
         if booking and booking['status'] == 'Pending':
@@ -204,7 +223,7 @@ class Ticket:
     TABLE_NAME = 'tickets'
 
     @classmethod
-    def create(cls, booking_id: str, seat_id: int, trip_id: int,
+    def create(cls, booking_id: int, seat_id: int, trip_id: int,
                price: Decimal, passenger_name: str) -> Dict[str, Any]:
         """Create a new ticket"""
         query = f"""
@@ -239,7 +258,7 @@ class Ticket:
         return execute_query_one(query, (ticket_id,))
 
     @classmethod
-    def get_all(cls, booking_id: str = None, trip_id: int = None,
+    def get_all(cls, booking_id: int = None, trip_id: int = None,
                 user_id: int = None) -> List[Dict[str, Any]]:
         """Get all tickets with optional filters"""
         conditions = []
@@ -280,7 +299,7 @@ class Ticket:
         return execute_query(query, tuple(params))
 
     @classmethod
-    def get_by_booking_id(cls, booking_id: str) -> List[Dict[str, Any]]:
+    def get_by_booking_id(cls, booking_id: int) -> List[Dict[str, Any]]:
         """Get all tickets for a booking"""
         return cls.get_all(booking_id=booking_id)
 
@@ -313,11 +332,23 @@ class Ticket:
 
     @classmethod
     def check_seat_booked(cls, trip_id: int, seat_id: int) -> bool:
-        """Check if a seat is already booked for a trip"""
+        """Check if a seat is already booked for a trip (excluding canceled bookings)"""
         query = f"""
             SELECT COUNT(*) as count
-            FROM {cls.TABLE_NAME}
-            WHERE trip_id = %s AND seat_id = %s
+            FROM {cls.TABLE_NAME} tk
+            JOIN bookings bk ON tk.booking_id = bk.id
+            WHERE tk.trip_id = %s AND tk.seat_id = %s AND bk.status != 'Canceled'
         """
         result = execute_query_one(query, (trip_id, seat_id))
         return result['count'] > 0 if result else False
+
+    @classmethod
+    def get_active_tickets_for_trip(cls, trip_id: int) -> List[Dict[str, Any]]:
+        """Get all tickets for a trip excluding canceled bookings"""
+        query = f"""
+            SELECT tk.id, tk.booking_id, tk.seat_id, tk.trip_id, tk.price, tk.passenger_name
+            FROM {cls.TABLE_NAME} tk
+            JOIN bookings bk ON tk.booking_id = bk.id
+            WHERE tk.trip_id = %s AND bk.status != 'Canceled'
+        """
+        return execute_query(query, (trip_id,))

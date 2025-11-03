@@ -195,15 +195,21 @@ class BookingCreateSerializer(serializers.Serializer):
             number_of_seats=validated_data['number_of_seats']
         )
 
-        # Create tickets
+        # Create tickets and mark seats as unavailable
         for ticket_data in tickets_data:
+            seat_id = ticket_data['seat_id']
+
+            # Create ticket
             Ticket.create(
                 booking_id=booking['id'],
-                seat_id=ticket_data['seat_id'],
+                seat_id=seat_id,
                 trip_id=trip_id,
                 price=trip['price_per_seat'],
                 passenger_name=ticket_data['passenger_name']
             )
+
+            # Mark seat as unavailable
+            Seat.update(seat_id, is_available=False)
 
         # Fetch full booking details
         return Booking.get_by_id(booking['id'])

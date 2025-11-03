@@ -1,0 +1,291 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Đặt vé xe - ReHearten{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-bus me-2"></i>Đặt vé xe khách
+            </h2>
+        </div>
+    </div>
+
+    <!-- Search Filter Card -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">
+                <i class="fas fa-search me-2"></i>Tìm chuyến xe
+            </h5>
+            <form id="tripSearchForm" class="row g-3">
+                <div class="col-md-4">
+                    <label for="startLocation" class="form-label">Điểm đi</label>
+                    <input type="text" class="form-control" id="startLocation" placeholder="Nhập điểm đi">
+                </div>
+                <div class="col-md-4">
+                    <label for="endLocation" class="form-label">Điểm đến</label>
+                    <input type="text" class="form-control" id="endLocation" placeholder="Nhập điểm đến">
+                </div>
+                <div class="col-md-4">
+                    <label for="tripDate" class="form-label">Ngày đi</label>
+                    <input type="date" class="form-control" id="tripDate">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Tìm kiếm
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="clearFilters">
+                        <i class="fas fa-times me-2"></i>Xóa bộ lọc
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Trips List -->
+    <div id="tripsContainer">
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Đang tải danh sách chuyến xe...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .trip-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid #0ea5e9;
+    }
+
+    .trip-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 30px rgba(14, 165, 233, 0.15);
+    }
+
+    .trip-route {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .route-arrow {
+        color: #0ea5e9;
+        font-size: 1.5rem;
+    }
+
+    .location-badge {
+        background: linear-gradient(135deg, #f0f9ff, #dbeafe);
+        color: #0c4a6e;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+
+    .trip-info {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin: 15px 0;
+    }
+
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .info-item i {
+        color: #0ea5e9;
+        width: 20px;
+        text-align: center;
+    }
+
+    .price-tag {
+        font-size: 1.5rem;
+        color: #0ea5e9;
+        font-weight: 700;
+    }
+
+    .seats-badge {
+        background: #dbeafe;
+        color: #075985;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .seats-badge.low {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tripsContainer = document.getElementById('tripsContainer');
+    const searchForm = document.getElementById('tripSearchForm');
+    const clearFiltersBtn = document.getElementById('clearFilters');
+
+    // Load trips on page load
+    loadTrips();
+
+    // Search form submission
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadTrips();
+    });
+
+    // Clear filters
+    clearFiltersBtn.addEventListener('click', function() {
+        searchForm.reset();
+        loadTrips();
+    });
+
+    function loadTrips() {
+        tripsContainer.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">Đang tải danh sách chuyến xe...</p>
+            </div>
+        `;
+
+        // Build query params
+        const params = new URLSearchParams();
+        const startLocation = document.getElementById('startLocation').value;
+        const endLocation = document.getElementById('endLocation').value;
+        const tripDate = document.getElementById('tripDate').value;
+
+        if (startLocation) params.append('start_location', startLocation);
+        if (endLocation) params.append('end_location', endLocation);
+        if (tripDate) params.append('date', tripDate);
+
+        // Fetch trips from API
+        fetch(`/api/trips/?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.length === 0) {
+                    tripsContainer.innerHTML = `
+                        <div class="card text-center py-5">
+                            <div class="card-body">
+                                <i class="fas fa-bus-alt fa-4x text-muted mb-3"></i>
+                                <h5>Không tìm thấy chuyến xe</h5>
+                                <p class="text-muted">Vui lòng thử lại với tiêu chí tìm kiếm khác</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                renderTrips(data);
+            })
+            .catch(error => {
+                console.error('Error loading trips:', error);
+                tripsContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Lỗi khi tải danh sách chuyến xe. Vui lòng thử lại sau.
+                    </div>
+                `;
+            });
+    }
+
+    function renderTrips(trips) {
+        const tripsHTML = trips.map(trip => {
+            // Get available seats
+            const availableSeats = trip.bus_total_seats || 0;
+            const seatsClass = availableSeats <= 5 ? 'low' : '';
+
+            // Format date and time
+            const departureDate = new Date(trip.departure_time);
+            const arrivalDate = new Date(trip.arrival_time);
+
+            const departureTimeStr = departureDate.toLocaleTimeString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const arrivalTimeStr = arrivalDate.toLocaleTimeString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const dateStr = departureDate.toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+
+            // Calculate duration
+            const duration = (arrivalDate - departureDate) / (1000 * 60 * 60);
+            const hours = Math.floor(duration);
+            const minutes = Math.floor((duration - hours) * 60);
+
+            return `
+                <div class="card trip-card mb-3">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="trip-route">
+                                    <span class="location-badge">
+                                        <i class="fas fa-map-marker-alt me-2"></i>
+                                        ${trip.start_location_name}, ${trip.start_location_city}
+                                    </span>
+                                    <i class="fas fa-arrow-right route-arrow"></i>
+                                    <span class="location-badge">
+                                        <i class="fas fa-map-marker-alt me-2"></i>
+                                        ${trip.end_location_name}, ${trip.end_location_city}
+                                    </span>
+                                </div>
+
+                                <div class="trip-info">
+                                    <div class="info-item">
+                                        <i class="fas fa-calendar"></i>
+                                        <span>${dateStr}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <i class="fas fa-clock"></i>
+                                        <span>${departureTimeStr} - ${arrivalTimeStr}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <i class="fas fa-hourglass-half"></i>
+                                        <span>${hours}h ${minutes}m</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <i class="fas fa-bus"></i>
+                                        <span>${trip.bus_model} (${trip.bus_license_plate})</span>
+                                    </div>
+                                </div>
+
+                                <div class="info-item">
+                                    <i class="fas fa-chair"></i>
+                                    <span class="seats-badge ${seatsClass}">
+                                        ${availableSeats} ghế trống
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 text-end">
+                                <div class="mb-3">
+                                    <div class="text-muted mb-1">Giá vé</div>
+                                    <div class="price-tag">${Number(trip.price_per_seat).toLocaleString('vi-VN')} ₫</div>
+                                </div>
+                                <a href="/trip/${trip.id}/" class="btn btn-primary btn-lg w-100">
+                                    <i class="fas fa-ticket-alt me-2"></i>Đặt vé
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        tripsContainer.innerHTML = tripsHTML;
+    }
+});
+</script>
+{% endblock %}

@@ -2,14 +2,19 @@
 Payments views using raw SQL (No ORM)
 """
 from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from decimal import Decimal
-from utils.db_utils import execute_query, execute_query_one
+from utils.db_utils import execute_query, execute_query_one, execute_update
 from .models import Payment, Wallet
 from .serializers import PaymentSerializer, WalletSerializer
+from accounts.decorators import login_required
+import json
 
 
 class PaymentViewSet(viewsets.ViewSet):
@@ -174,5 +179,49 @@ class WalletViewSet(viewsets.ViewSet):
         return execute_query_one("SELECT * FROM wallets WHERE user_id = %s", (user_id,))
 
 
+@require_http_methods(["POST"])
+def update_payment_method(request, payment_id):
+    """Update payment method for a payment - allows guest users"""
+    try:
+        # Get payment
+        payment = Payment.get_payment(payment_id)
+        if not payment:
+            return JsonResponse({'error': 'Payment not found'}, status=404)
+
+        # Check if guest user has session or logged-in user
+        from accounts.utils import get_current_user
+        current_user = get_current_user(request)
+        is_guest_session = request.session.get('guest_payment_id') == payment_id
+
+        if not current_user and not is_guest_session:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        # Parse request body
+        data = json.loads(request.body)
+        payment_method = data.get('payment_method')
+
+        if not payment_method:
+            return JsonResponse({'error': 'Payment method is required'}, status=400)
+
+        # Validate payment method
+        valid_methods = [method[0] for method in Payment.PAYMENT_METHODS]
+        if payment_method not in valid_methods:
+            return JsonResponse({'error': 'Invalid payment method'}, status=400)
+
+        # Update payment method
+        query = "UPDATE payments SET payment_method = %s WHERE id = %s"
+        success = execute_update(query, (payment_method, payment_id))
+
+        if success:
+            return JsonResponse({
+                'success': True,
+                'message': 'Payment method updated successfully',
+                'payment_method': payment_method
+            })
+        else:
+            return JsonResponse({'error': 'Failed to update payment method'}, status=500)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
     

@@ -34,21 +34,32 @@ class Payment:
     ]
     
     @classmethod
-    def create(cls, booking_id: str, amount: Decimal, payment_method: str,
+    def create(cls, booking_id: int, amount: Decimal, payment_method: str,
                transaction_code: str, wallet_id: Optional[str] = None,
                status: str = 'Pending') -> Optional[Dict[str, Any]]:
         """Create a new payment"""
         payment_id = str(uuid.uuid4())
         payment_time = now()
 
-        query = f"""
-            INSERT INTO {cls.TABLE_NAME}
-            (id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id
-        """
-        result = execute_query(query, (payment_id, booking_id, amount, payment_method,
-                                      status, payment_time, transaction_code, wallet_id))
+        # Build query dynamically based on whether wallet_id is provided
+        if wallet_id:
+            query = f"""
+                INSERT INTO {cls.TABLE_NAME}
+                (id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id
+            """
+            result = execute_query(query, (payment_id, booking_id, amount, payment_method,
+                                          status, payment_time, transaction_code, wallet_id))
+        else:
+            query = f"""
+                INSERT INTO {cls.TABLE_NAME}
+                (id, booking_id, amount, payment_method, status, payment_time, transaction_code)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, booking_id, amount, payment_method, status, payment_time, transaction_code
+            """
+            result = execute_query(query, (payment_id, booking_id, amount, payment_method,
+                                          status, payment_time, transaction_code))
         return result[0] if result else None
 
     @classmethod
@@ -65,8 +76,20 @@ class Payment:
     @classmethod
     def get_payment(cls, payment_id: int) -> Optional[Dict[str, Any]]:
         """Display payment details by payment_id"""
-        query = f"SELECT id, booking_id, amount, payment_method, status, payment_time, transaction_code, wallet_id FROM {cls.TABLE_NAME} WHERE id = %s"
+        query = f"SELECT id, booking_id, amount, payment_method, status, payment_time, transaction_code FROM {cls.TABLE_NAME} WHERE id = %s"
         return execute_query_one(query, (payment_id,))
+
+    @classmethod
+    def get_by_booking_id(cls, booking_id: int) -> Optional[Dict[str, Any]]:
+        """Get payment by booking_id"""
+        query = f"SELECT id, booking_id, amount, payment_method, status, payment_time, transaction_code FROM {cls.TABLE_NAME} WHERE booking_id = %s"
+        return execute_query_one(query, (booking_id,))
+
+    @classmethod
+    def delete(cls, payment_id: str) -> bool:
+        """Delete a payment"""
+        query = f"DELETE FROM {cls.TABLE_NAME} WHERE id = %s"
+        return execute_delete(query, (payment_id,)) > 0
 
 class Wallet:
     TABLE_NAME = 'wallets'
